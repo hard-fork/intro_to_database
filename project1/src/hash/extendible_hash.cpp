@@ -8,7 +8,50 @@ namespace cmudb {
 
 template <typename K, typename V>
 Bucket<K, V>::Bucket(){
+  depth = 0;
+}
 
+
+template <typename K, typename V>
+Bucket<K, V>::IsFull(){
+  return items.size() >= BUCKET_MAX;
+}
+
+template <typename K, typename V>
+bool Bucket<K, V>::Find(const K &key){
+  for(std:pair<K, V> item : items){
+    if(item.first == key){
+      return true;
+    }
+  }
+
+  return false;
+}
+
+template <typename K, typename V>
+void Bucket<K, V>::Insert(const K &key, const V &value){
+  std::pair<K, V> item = std::make_pair(key, value);
+  // to do
+  if(! IsFull()){
+    
+  }
+}
+
+template <typename K, typename V>
+bool Bucket<K, V>::Remove(const K &key){
+  for(auto it = items.begin(); it != items.end(); it ++){
+    if(it -> first == key){
+      items.erase(it);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+template <typename K, typename V>
+int Bucket<K, V>::GetLocalDepth(){
+  return depth;
 }
 
 /*
@@ -32,7 +75,7 @@ size_t ExtendibleHash<K, V>::HashKey(const K &key) {
  */
 template <typename K, typename V>
 int ExtendibleHash<K, V>::GetGlobalDepth() const {
-  return 0;
+  return depth;
 }
 
 /*
@@ -41,7 +84,7 @@ int ExtendibleHash<K, V>::GetGlobalDepth() const {
  */
 template <typename K, typename V>
 int ExtendibleHash<K, V>::GetLocalDepth(int bucket_id) const {
-  return 0;
+  return buckets[bucket_id].GetLocalDepth();
 }
 
 /*
@@ -49,7 +92,7 @@ int ExtendibleHash<K, V>::GetLocalDepth(int bucket_id) const {
  */
 template <typename K, typename V>
 int ExtendibleHash<K, V>::GetNumBuckets() const {
-  return 0;
+  return b_num;
 }
 
 /*
@@ -75,7 +118,9 @@ bool ExtendibleHash<K, V>::Remove(const K &key) {
  * global depth
  */
 template <typename K, typename V>
-void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {}
+void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {
+
+}
 
 template class ExtendibleHash<page_id_t, Page *>;
 template class ExtendibleHash<Page *, std::list<Page *>::iterator>;
