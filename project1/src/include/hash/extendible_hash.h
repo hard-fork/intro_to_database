@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <vector>
 #include <string>
+#include <utility>
 
 #include "hash/hash_table.h"
 
@@ -24,15 +25,13 @@ class Bucket{
 public:
   Bucket();
   bool IsFull();
-  bool Find(const K &key);
+  bool Find(const K &key, V &value);
   bool Remove(const K &key);
   void Insert(const K &key, const V &value);
   int GetLocalDepth();
 
 private:
-  K keys[BUCKET_MAX];
-  V keys[BUCKET_MAX];
-  int index;
+  std::vector<std::pair<K,V>&> items;
   int depth;
 }
 

@@ -8,7 +8,7 @@ namespace cmudb {
 
 template <typename K, typename V>
 Bucket<K, V>::Bucket(){
-  depth = 0;
+  depth = 1;
 }
 
 
@@ -18,9 +18,10 @@ Bucket<K, V>::IsFull(){
 }
 
 template <typename K, typename V>
-bool Bucket<K, V>::Find(const K &key){
+bool Bucket<K, V>::Find(const K &key, V &value){
   for(std:pair<K, V> item : items){
     if(item.first == key){
+      value = item.second;
       return true;
     }
   }
@@ -30,11 +31,7 @@ bool Bucket<K, V>::Find(const K &key){
 
 template <typename K, typename V>
 void Bucket<K, V>::Insert(const K &key, const V &value){
-  std::pair<K, V> item = std::make_pair(key, value);
-  // to do
-  if(! IsFull()){
-    
-  }
+  items.push_back(std::make_pair(key, value));
 }
 
 template <typename K, typename V>
@@ -66,7 +63,7 @@ ExtendibleHash<K, V>::ExtendibleHash(size_t size) {}
  */
 template <typename K, typename V>
 size_t ExtendibleHash<K, V>::HashKey(const K &key) {
-  return std::hash<K>{}(key);
+  return std::hash<K>{}(key) & ((1 << depth) - 1);
 }
 
 /*
@@ -100,7 +97,7 @@ int ExtendibleHash<K, V>::GetNumBuckets() const {
  */
 template <typename K, typename V>
 bool ExtendibleHash<K, V>::Find(const K &key, V &value) {
-  return false;
+  return buckets[HashKey(key)].find(key, value);
 }
 
 /*
@@ -109,7 +106,7 @@ bool ExtendibleHash<K, V>::Find(const K &key, V &value) {
  */
 template <typename K, typename V>
 bool ExtendibleHash<K, V>::Remove(const K &key) {
-  return false;
+  return buckets[HashKey(key)].Remove(key);
 }
 
 /*
@@ -119,6 +116,7 @@ bool ExtendibleHash<K, V>::Remove(const K &key) {
  */
 template <typename K, typename V>
 void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {
+  //to do
 
 }
 
