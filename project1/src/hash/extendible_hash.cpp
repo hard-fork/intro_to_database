@@ -7,14 +7,14 @@
 namespace cmudb {
 
 template <typename K, typename V>
-Bucket<K, V>::Bucket(){
-  depth = 1;
+Bucket<K, V>::Bucket(size_t size, int d){
+  depth = d;
+  bucket_size = size;
 }
-
 
 template <typename K, typename V>
 Bucket<K, V>::IsFull(){
-  return items.size() >= BUCKET_MAX;
+  return items.size() >= bucket_size;
 }
 
 template <typename K, typename V>
@@ -47,6 +47,29 @@ bool Bucket<K, V>::Remove(const K &key){
 }
 
 template <typename K, typename V>
+size_t Bucket<K, V>::HashCode(const K &key){
+  return std::hash<K>{}(key);
+}
+
+template <typename K, typename V>
+std::pair<Bucket<K, V>&, Bucket<K, V>&> Bucket<K, V>::Split(){
+  depth ++;
+
+  Bucket<K, V> b0(bucket_size, depth);
+  Bucket<K, V> b1(bucket_size, depth);
+
+  for(std::pair<K, V>& item : items){
+    if(! HashCode(item.first) & (1 << (depth - 1))){
+      b0.push_back(item);
+    } else {
+      b1.push_back(item);
+    }
+  }
+
+  return make_pair(b0, b1);
+}
+
+template <typename K, typename V>
 int Bucket<K, V>::GetLocalDepth(){
   return depth;
 }
@@ -61,7 +84,16 @@ void Bucket<K, V>::SetDepth(int d){
  * array_size: fixed array size for each bucket
  */
 template <typename K, typename V>
-ExtendibleHash<K, V>::ExtendibleHash(size_t size) {}
+ExtendibleHash<K, V>::ExtendibleHash(size_t size) {
+  depth = 1;
+  bucket_num = 2;
+  bucket_size = size;
+
+  Bucket<K, V> b1(size, depth);
+  Bucket<K, V> b2(size, depth);
+  buckets.push_back(b1);
+  buckets.push_back(b2);
+}
 
 /*
  * helper function to calculate the hashing address of input key
@@ -94,7 +126,7 @@ int ExtendibleHash<K, V>::GetLocalDepth(int bucket_id) const {
  */
 template <typename K, typename V>
 int ExtendibleHash<K, V>::GetNumBuckets() const {
-  return b_num;
+  return bucket_num;
 }
 
 /*
@@ -121,8 +153,43 @@ bool ExtendibleHash<K, V>::Remove(const K &key) {
  */
 template <typename K, typename V>
 void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {
-  //to do
+  size_t hash_addr = HashKey(key);
+  Bucket<K, V>& b = buckets[hash_addr];
 
+  if(b.IsFull()){
+    b.Insert(key, value);
+    std::pair<Bucket<K, V>&, Bucket<K, V>&> s_bucket = b.Split();
+
+    if(b.GetLocalDepth() > depth){
+      depth ++;
+
+      // double buckets vector
+      auto begin = buckets.begin();
+      auto end = buckets.end();
+      while(begin != end){
+        buckets.push_back(*begin);
+        begin ++;
+      }
+
+      buckets[hash_addr] = s_bucket.first;
+      buckets[hash_addr | (1 << (depth - 1))] = s_bucket.second;
+    } else{
+      int local_depth = b.GetLocalDepth();
+      size_t addr1 = hash_addr & ((1 << (local_depth - 1)) - 1);
+
+      for(int i = 0; i < buckets.size(); i ++){
+        if(i & ((1 << (local_depth - 1) - 1) == addr1){
+          if(i & (1 << (local_depth - 1))){
+            buckets[i] = s_buckets.second;
+          } else {
+            buckets[i] = s_buckets.first;
+          }
+        }
+      }
+    }
+  } else{
+    b.Insert(key, value);
+  }
 }
 
 template class ExtendibleHash<page_id_t, Page *>;

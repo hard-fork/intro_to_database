@@ -16,24 +16,28 @@
 
 #include "hash/hash_table.h"
 
-#define BUCKET_MAX 10
-
 namespace cmudb {
 
 template <typename K, typename V>
 class Bucket{
 public:
-  Bucket();
+  Bucket(size_t size, int d);
+
   bool IsFull();
   bool Find(const K &key, V &value);
   bool Remove(const K &key);
   void Insert(const K &key, const V &value);
+
+  std::pair<Bucket<K, V>&, Bucket<K, V>&> Split();
+  size_t HashCode(const K &key);
+
   int GetLocalDepth();
   void SetDepth(int d);
 
 private:
   std::vector<std::pair<K,V>&> items;
   int depth;
+  size_t bucket_size;
 }
 
 template <typename K, typename V>
@@ -56,6 +60,7 @@ private:
   // add your own member variables here
   std::vector<Bucket&> buckets;
   int depth;
-  int b_num;
+  int bucket_num;
+  size_t bucket_size;
 };
 } // namespace cmudb
