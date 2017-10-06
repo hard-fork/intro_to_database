@@ -29,6 +29,7 @@ public:
   bool Remove(const K &key);
   void Insert(const K &key, const V &value);
   int GetLocalDepth();
+  void SetDepth(int d);
 
 private:
   std::vector<std::pair<K,V>&> items;

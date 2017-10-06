@@ -51,6 +51,11 @@ int Bucket<K, V>::GetLocalDepth(){
   return depth;
 }
 
+template <typename K, typename V>
+void Bucket<K, V>::SetDepth(int d){
+  depth = d;
+}
+
 /*
  * constructor
  * array_size: fixed array size for each bucket
