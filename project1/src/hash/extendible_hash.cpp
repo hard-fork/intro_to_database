@@ -1,4 +1,6 @@
 #include <list>
+#include <mutex>
+#include <utility>
 #include <functional>
 
 #include "hash/extendible_hash.h"
@@ -13,13 +15,13 @@ Bucket<K, V>::Bucket(size_t size, int d){
 }
 
 template <typename K, typename V>
-Bucket<K, V>::IsFull(){
+bool Bucket<K, V>::IsFull(){
   return items.size() >= bucket_size;
 }
 
 template <typename K, typename V>
 bool Bucket<K, V>::Find(const K &key, V &value){
-  for(std:pair<K, V> item : items){
+  for(std::pair<K, V> item : items){
     if(item.first == key){
       value = item.second;
       return true;
@@ -38,6 +40,8 @@ template <typename K, typename V>
 bool Bucket<K, V>::Remove(const K &key){
   for(auto it = items.begin(); it != items.end(); it ++){
     if(it -> first == key){
+      std::lock_guard<std::mutex> lock(mtx);
+
       items.erase(it);
       return true;
     }
@@ -52,21 +56,21 @@ size_t Bucket<K, V>::HashCode(const K &key){
 }
 
 template <typename K, typename V>
-std::pair<Bucket<K, V>&, Bucket<K, V>&> Bucket<K, V>::Split(){
+std::pair<Bucket<K, V>, Bucket<K, V>> Bucket<K, V>::Split(){
   depth ++;
 
   Bucket<K, V> b0(bucket_size, depth);
   Bucket<K, V> b1(bucket_size, depth);
 
   for(std::pair<K, V>& item : items){
-    if(! HashCode(item.first) & (1 << (depth - 1))){
-      b0.push_back(item);
+    if(HashCode(item.first) & (1 << (depth - 1))){
+      b1.items.push_back(item);
     } else {
-      b1.push_back(item);
+      b0.items.push_back(item);
     }
   }
 
-  return make_pair(b0, b1);
+  return std::make_pair(b0, b1);
 }
 
 template <typename K, typename V>
@@ -91,8 +95,8 @@ ExtendibleHash<K, V>::ExtendibleHash(size_t size) {
 
   Bucket<K, V> b1(size, depth);
   Bucket<K, V> b2(size, depth);
-  buckets.push_back(b1);
-  buckets.push_back(b2);
+  buckets.push_back(&b1);
+  buckets.push_back(&b2);
 }
 
 /*
@@ -118,7 +122,7 @@ int ExtendibleHash<K, V>::GetGlobalDepth() const {
  */
 template <typename K, typename V>
 int ExtendibleHash<K, V>::GetLocalDepth(int bucket_id) const {
-  return buckets[bucket_id].GetLocalDepth();
+  return buckets[bucket_id] -> GetLocalDepth();
 }
 
 /*
@@ -134,7 +138,7 @@ int ExtendibleHash<K, V>::GetNumBuckets() const {
  */
 template <typename K, typename V>
 bool ExtendibleHash<K, V>::Find(const K &key, V &value) {
-  return buckets[HashKey(key)].find(key, value);
+  return buckets[HashKey(key)] -> Find(key, value);
 }
 
 /*
@@ -143,7 +147,7 @@ bool ExtendibleHash<K, V>::Find(const K &key, V &value) {
  */
 template <typename K, typename V>
 bool ExtendibleHash<K, V>::Remove(const K &key) {
-  return buckets[HashKey(key)].Remove(key);
+  return buckets[HashKey(key)] -> Remove(key);
 }
 
 /*
@@ -154,13 +158,17 @@ bool ExtendibleHash<K, V>::Remove(const K &key) {
 template <typename K, typename V>
 void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {
   size_t hash_addr = HashKey(key);
-  Bucket<K, V>& b = buckets[hash_addr];
+  Bucket<K, V>* b = buckets[hash_addr];
 
-  if(b.IsFull()){
-    b.Insert(key, value);
-    std::pair<Bucket<K, V>&, Bucket<K, V>&> s_bucket = b.Split();
+  if(b -> IsFull()){
+    b -> Insert(key, value);
 
-    if(b.GetLocalDepth() > depth){
+    std::lock_guard<std::mutex> lock(mtx);
+
+    std::pair<Bucket<K, V>, Bucket<K, V>> s_buckets = b -> Split();
+    bucket_num ++;
+
+    if(b -> GetLocalDepth() > depth){
       depth ++;
 
       // double buckets vector
@@ -171,24 +179,27 @@ void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {
         begin ++;
       }
 
-      buckets[hash_addr] = s_bucket.first;
-      buckets[hash_addr | (1 << (depth - 1))] = s_bucket.second;
+      buckets[hash_addr] = &(s_buckets.first);
+      buckets[hash_addr | (1 << (depth - 1))] = &(s_buckets.second);
     } else{
-      int local_depth = b.GetLocalDepth();
-      size_t addr1 = hash_addr & ((1 << (local_depth - 1)) - 1);
+      int local_depth = b -> GetLocalDepth();
+      int top_bit = 1 << (local_depth - 1);
+      int mask = top_bit - 1;
+
+      size_t mask_addr = hash_addr & mask;
 
       for(int i = 0; i < buckets.size(); i ++){
-        if(i & ((1 << (local_depth - 1) - 1) == addr1){
-          if(i & (1 << (local_depth - 1))){
-            buckets[i] = s_buckets.second;
+        if((i & mask) == mask_addr){
+          if(i & top_bit){
+            buckets[i] = &(s_buckets.second);
           } else {
-            buckets[i] = s_buckets.first;
+            buckets[i] = &(s_buckets.first);
           }
         }
       }
     }
   } else{
-    b.Insert(key, value);
+    b -> Insert(key, value);
   }
 }
 
